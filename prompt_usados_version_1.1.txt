@@ -1,0 +1,283 @@
+Imagina que eres un desarollador web con experiencia en el tema de hilos usando Future, Callable y ExecutorServices, y te piden como prueba desarrollar un juego para una compañia, el juego consiste en lo siguiente: 
+Hay que hacer una simulación con hilos de un torneo de tenis el cual tiene 16 jugadores, cada partido se juega al mejor de 3 sets (gana el juego quien gane 2 sets primero) el ganador de cada juego avanza a la siguiente ronda, todas las rondas se tienen que jugar en simultaneo, la siguiente ronda inicia cuando todos los partidos de la ronda actual hayan terminado.
+El torneo consiste de 4 rondas, octavos, cuartos, semis y final, yo la opcion que veo bien es usar un hilo para cada juego
+
+El ganador de cada set se determinara aleatoriamente mediante numeros del 0 al 5, el jugador que saque un numero mayor al rival gana un set, los sets se tienen que ir almacenando en alguna parte para que se pueda hacer el conteo de quien llega primero a 2 de los 3 sets a jugar, el jugador que quede ganador de cada juego pasara a la siguiente ronda. 
+
+lo que espero de la aplicacion es que se presenten al ultimo en pantalla el vs de cada jugardor ejemplo "jugador 1 vs jugador 16" debajo se presente el set jugador junto al nombre del jugador que lo ganó "set 1: jugador 16" y al final de los 3 o 2 sets que se jueguen se presente el ganador del juego, cada juego tiene que durar un aproximado de entre 1.5 a 2 segundos. 
+
+
+ChatGPT dijo:
+Memoria guardada actualizada
+Perfecto, Sergi. A continuación te presento un ejemplo funcional en Java que cumple con los requisitos del torneo de tenis usando ExecutorService, Callable y Future, con una simulación de partidas al mejor de 3 sets y rondas paralelas sincronizadas:
+
+🧠 Conceptos clave usados:
+ExecutorService para ejecutar los juegos en paralelo.
+
+Callable<MatchResult> para cada partido, permitiendo devolver un resultado.
+
+Future<MatchResult> para esperar que todos los juegos terminen antes de pasar a la siguiente ronda.
+
+Thread.sleep con tiempo aleatorio entre 1500 y 2000 ms para simular duración del juego.
+
+💻 Código Java completo:
+java
+Copiar
+Editar
+import java.util.*;
+import java.util.concurrent.*;
+
+public class TennisTournament {
+
+    private static final int TOTAL_PLAYERS = 16;
+    private static final Random random = new Random();
+
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
+        List<String> players = new ArrayList<>();
+        for (int i = 1; i <= TOTAL_PLAYERS; i++) {
+            players.add("Jugador " + i);
+        }
+
+        ExecutorService executor = Executors.newFixedThreadPool(8);
+
+        int round = 1;
+        while (players.size() > 1) {
+            System.out.println("\n=== Ronda " + round + " ===");
+
+            List<Callable<MatchResult>> roundTasks = new ArrayList<>();
+            for (int i = 0; i < players.size(); i += 2) {
+                String player1 = players.get(i);
+                String player2 = players.get(i + 1);
+                roundTasks.add(() -> simulateMatch(player1, player2));
+            }
+
+            List<Future<MatchResult>> results = executor.invokeAll(roundTasks);
+
+            players.clear();
+            for (Future<MatchResult> future : results) {
+                MatchResult result = future.get();
+                System.out.println(result);
+                players.add(result.winner());
+            }
+
+            round++;
+        }
+
+        System.out.println("\n🏆 ¡Ganador del torneo: " + players.get(0) + "!");
+        executor.shutdown();
+    }
+
+    public static MatchResult simulateMatch(String player1, String player2) throws InterruptedException {
+        int set1 = 0, set2 = 0;
+        List<String> setWinners = new ArrayList<>();
+
+        int setNumber = 1;
+        while (set1 < 2 && set2 < 2) {
+            int score1 = random.nextInt(6);  // 0-5
+            int score2 = random.nextInt(6);
+            while (score1 == score2) {
+                score2 = random.nextInt(6); // desempate
+            }
+
+            String winner;
+            if (score1 > score2) {
+                set1++;
+                winner = player1;
+            } else {
+                set2++;
+                winner = player2;
+            }
+
+            setWinners.add("Set " + setNumber + ": " + winner);
+            setNumber++;
+            Thread.sleep(1500 + random.nextInt(501)); // 1.5s - 2s
+        }
+
+        String winner = set1 == 2 ? player1 : player2;
+        return new MatchResult(player1, player2, setWinners, winner);
+    }
+
+    public record MatchResult(String player1, String player2, List<String> sets, String winner) {
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            sb.append(player1).append(" vs ").append(player2).append("\n");
+            for (String set : sets) {
+                sb.append(set).append("\n");
+            }
+            sb.append("Ganador del partido: ").append(winner).append("\n");
+            return sb.toString();
+        }
+    }
+}
+✅ Resultado esperado (ejemplo de salida):
+python
+Copiar
+Editar
+=== Ronda 1 ===
+Jugador 1 vs Jugador 16
+Set 1: Jugador 16
+Set 2: Jugador 1
+Set 3: Jugador 1
+Ganador del partido: Jugador 1
+...
+🏆 ¡Ganador del torneo: Jugador 1!
+¿Te gustaría que lo adaptemos para hacerlo visual (GUI con Swing o JavaFX), o que lo preparemos como una API REST o app web para producción?
+
+
+
+
+
+
+Dijiste:
+puedes hacer el programa en clases separadas, un app y otras a parte 
+
+
+ChatGPT dijo:
+¡Claro, Sergi! A continuación te muestro cómo estructurar el programa en varias clases separadas para mantener un diseño limpio y organizado:
+
+📁 Estructura propuesta:
+cpp
+Copiar
+Editar
+tennis-tournament/
+├── App.java                  // Clase principal
+├── Match.java               // Lógica de un partido
+├── MatchResult.java         // Resultado de un partido
+├── Tournament.java          // Lógica del torneo
+🔹 App.java (Clase principal)
+java
+Copiar
+Editar
+public class App {
+    public static void main(String[] args) {
+        Tournament tournament = new Tournament();
+        tournament.start();
+    }
+}
+🔹 Tournament.java
+java
+Copiar
+Editar
+import java.util.*;
+import java.util.concurrent.*;
+
+public class Tournament {
+    private static final int TOTAL_PLAYERS = 16;
+    private final ExecutorService executor = Executors.newFixedThreadPool(8);
+
+    public void start() {
+        List<String> players = new ArrayList<>();
+        for (int i = 1; i <= TOTAL_PLAYERS; i++) {
+            players.add("Jugador " + i);
+        }
+
+        int round = 1;
+        while (players.size() > 1) {
+            System.out.println("\n=== Ronda " + round + " ===");
+            List<Callable<MatchResult>> matches = new ArrayList<>();
+
+            for (int i = 0; i < players.size(); i += 2) {
+                String p1 = players.get(i);
+                String p2 = players.get(i + 1);
+                matches.add(new Match(p1, p2));
+            }
+
+            try {
+                List<Future<MatchResult>> results = executor.invokeAll(matches);
+
+                players.clear();
+                for (Future<MatchResult> result : results) {
+                    MatchResult matchResult = result.get();
+                    System.out.println(matchResult);
+                    players.add(matchResult.winner());
+                }
+
+            } catch (InterruptedException | ExecutionException e) {
+                e.printStackTrace();
+            }
+
+            round++;
+        }
+
+        System.out.println("\n🏆 ¡Ganador del torneo: " + players.get(0) + "!");
+        executor.shutdown();
+    }
+}
+🔹 Match.java
+java
+Copiar
+Editar
+import java.util.*;
+import java.util.concurrent.Callable;
+
+public class Match implements Callable<MatchResult> {
+    private final String player1;
+    private final String player2;
+    private static final Random random = new Random();
+
+    public Match(String player1, String player2) {
+        this.player1 = player1;
+        this.player2 = player2;
+    }
+
+    @Override
+    public MatchResult call() throws Exception {
+        int setsP1 = 0;
+        int setsP2 = 0;
+        List<String> setResults = new ArrayList<>();
+        int setNumber = 1;
+
+        while (setsP1 < 2 && setsP2 < 2) {
+            int score1 = random.nextInt(6);
+            int score2 = random.nextInt(6);
+            while (score1 == score2) {
+                score2 = random.nextInt(6);
+            }
+
+            String winner;
+            if (score1 > score2) {
+                setsP1++;
+                winner = player1;
+            } else {
+                setsP2++;
+                winner = player2;
+            }
+
+            setResults.add("Set " + setNumber + ": " + winner);
+            setNumber++;
+
+            Thread.sleep(1500 + random.nextInt(501)); // 1.5s - 2s
+        }
+
+        String matchWinner = setsP1 == 2 ? player1 : player2;
+        return new MatchResult(player1, player2, setResults, matchWinner);
+    }
+}
+🔹 MatchResult.java
+java
+Copiar
+Editar
+import java.util.List;
+
+public record MatchResult(String player1, String player2, List<String> sets, String winner) {
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(player1).append(" vs ").append(player2).append("\n");
+        for (String set : sets) {
+            sb.append(set).append("\n");
+        }
+        sb.append("Ganador del partido: ").append(winner).append("\n");
+        return sb.toString();
+    }
+}
+✅ ¿Qué ventajas te da esta estructura?
+Escalabilidad: Puedes añadir rondas adicionales, estadísticas, logs, etc.
+
+Mantenibilidad: Las clases están claramente separadas por responsabilidad.
+
+Legibilidad: Más fácil de seguir y depurar.
+
+¿Quieres que lo empaquetemos con un pom.xml (Maven) o build.gradle (Gradle)? ¿O prefieres empaquetarlo como un .jar ejecutable?
